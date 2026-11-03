@@ -51,6 +51,9 @@ while (($#)); do
 	shift 2
 done
 
+# CloudLab names each host after its node in profile.py.
+[[ "$(hostname -s)" == trex ]] || die "run phase1.sh on the trex node, not $(hostname -s)"
+
 SRC="$STATE_DIR/src/upf"
 OUT="$STATE_DIR/results/phase1/$(date -u +%Y%m%dT%H%M%SZ)"
 mkdir -p "$OUT"
