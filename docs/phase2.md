@@ -118,7 +118,7 @@ passed in the first run.
   tags the IP header, which the UPF's GTP-U encapsulation replaces; it
   matched only 15 of 1,000,000 packets.
 - **`baseline` fails its tail-latency check on a UPF that has already served
-  test runs.** Investigated 2026-11-03:
+  test runs** ([omec-project/upf#1392]). Investigated 2026-11-03:
   - CPU pinning is as upstream intends: `upf.sh` gives the `bess` container
     two NUMA-local CPUs, like `docker_setup.sh`'s `--cpuset-cpus`, and
     `up4.bess` pins the busy-polling worker to the first. Host isolation
@@ -153,3 +153,4 @@ passed in the first run.
 
 [trex-core#1182]: https://github.com/cisco-system-traffic-generator/trex-core/issues/1182
 [omec-project/upf#1331]: https://github.com/omec-project/upf/pull/1331
+[omec-project/upf#1392]: https://github.com/omec-project/upf/issues/1392
