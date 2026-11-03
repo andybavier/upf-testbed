@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: Apache-2.0
 #
-# CloudLab startup service for every node: startup.sh trex|wire|none
+# CloudLab startup service for every node: startup.sh trex|wire|upf|none
 #
 # Runs on every boot. The first boot enables the IOMMU and reboots; later boots
 # set up hugepages, bind the experiment ports to vfio-pci and set up the role.
@@ -9,14 +9,15 @@
 set -euo pipefail
 source "$(dirname "$0")/lib.sh"
 
-ROLE="${1:?usage: startup.sh trex|wire|none}"
+ROLE="${1:?usage: startup.sh trex|wire|upf|none}"
 
 mkdir -p "$STATE_DIR" /var/log/upf-testbed
 exec > >(tee -a /var/log/upf-testbed/startup.log) 2>&1
 log "startup.sh $ROLE"
 
-# dpdk has dpdk-devbind.py; dpdk-dev has dpdk-testpmd.
-PACKAGES=(dpdk dpdk-dev docker.io ethtool jq numactl pciutils python3-yaml)
+# dpdk has dpdk-devbind.py; dpdk-dev has dpdk-testpmd; the UPF build needs
+# docker-buildx.
+PACKAGES=(dpdk dpdk-dev docker.io docker-buildx ethtool jq numactl pciutils python3-yaml)
 
 install_packages() {
 	# Check the packages rather than a marker, so adding one to the list
@@ -88,6 +89,13 @@ record_ports() {
 	load_ports
 }
 
+# The MACs at the far end of each link, for TRex's and the UPF's neighbors.
+record_peers() {
+	grep -q PORT0_PEER_MAC "$PORTS_ENV" && return
+	python3 "$TESTBED_DIR/scripts/manifest.py" peers "$(hostname -s)" >> "$PORTS_ENV"
+	load_ports
+}
+
 bind_ports() {
 	modprobe vfio-pci
 	local pci group dev
@@ -129,13 +137,15 @@ install_packages
 enable_iommu
 setup_hugepages
 record_ports
+record_peers
 bind_ports
 check_ddp
 
 case "$ROLE" in
 trex) "$TESTBED_DIR/scripts/install-trex.sh" ;;
 wire) "$TESTBED_DIR/scripts/wire.sh" start ;;
-none) ;;
+# upf.sh builds and starts the UPF on demand; see docs/phase2.md.
+upf | none) ;;
 *) die "unknown role $ROLE" ;;
 esac
 

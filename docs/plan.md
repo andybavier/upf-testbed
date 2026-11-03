@@ -78,14 +78,13 @@ Built in phase 1:
 - `scripts/phase1.sh` and `scripts/trex-rx-check.sh`: the phase 1 matrix, and
   a receive check for any TRex release with its own client.
 
-Still to build:
+Built in phase 2 (see [phase2.md](phase2.md)):
 
-- `scripts/setup-upf.sh`: clones the UPF at a given ref, builds its images,
-  binds the experiment ports to vfio-pci and writes `upf.jsonc` for DPDK mode.
-- The TRex daemon on port 8090, which `ptf_runner.py` uses to push
-  `ptf/config/trex-cfg-for-ptf.yaml` and start TRex. That config hardcodes
-  the old testbed's PCI addresses, MACs and threads, so phase 2 needs a
-  version generated for this host.
+- `scripts/upf.sh`: builds the UPF images from a branch and runs them in DPDK
+  mode the way `scripts/docker_setup.sh` does, with the addresses the PTF
+  tests expect.
+- `scripts/ptf.sh`: adapts the branch's PTF config to this testbed, starts the
+  TRex daemon and runs a PTF suite.
 - `testbed`: one entry point, for example
   `testbed run unary|linerate|integration --ref <branch>`. It builds that
   branch, runs the suite, and copies xunit results, TRex and BESS logs and

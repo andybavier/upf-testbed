@@ -78,8 +78,16 @@ def main() -> None:
         "port_bandwidth_gb": 10,
         "c": args.cores,
         "port_info": [
-            {"src_mac": ports["PORT0_MAC"], "dest_mac": UPF_ACCESS_MAC},
-            {"src_mac": ports["PORT1_MAC"], "dest_mac": UPF_CORE_MAC},
+            # The UPF node's ports, from the manifest, once startup.sh has
+            # recorded them.
+            {
+                "src_mac": ports["PORT0_MAC"],
+                "dest_mac": ports.get("PORT0_PEER_MAC", UPF_ACCESS_MAC),
+            },
+            {
+                "src_mac": ports["PORT1_MAC"],
+                "dest_mac": ports.get("PORT1_PEER_MAC", UPF_CORE_MAC),
+            },
         ],
         "platform": {
             "master_thread_id": cpus[0],

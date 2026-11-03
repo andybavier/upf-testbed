@@ -1,0 +1,126 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: Apache-2.0
+#
+# ptf.sh [options] unary|linerate [TEST]
+#
+# Run the UPF's PTF tests from the trex node against the UPF that upf.sh runs
+# on the upf node. Checks out the UPF, adapts its PTF config to this testbed
+# (what ptf/README.md step 1 asks for), builds the PTF image if needed, starts
+# the TRex daemon and runs ptf/run_tests.
+
+set -euo pipefail
+source "$(dirname "$0")/lib.sh"
+require_root
+
+UPF_REPO=https://github.com/omec-project/upf
+UPF_REF=main
+FETCH=1
+AVX2_RX=()
+
+usage() {
+	cat <<-EOF
+		usage: ptf.sh [options] unary|linerate [TEST]
+		  --upf-repo URL   UPF repository ($UPF_REPO)
+		  --upf-ref REF    branch or commit to test ($UPF_REF)
+		  --no-fetch       test the checkout as it is
+		  --avx2-rx        leave out the trex-core#1182 SIMD cap
+		TEST is a test file or file.TestCase within the suite, e.g. baseline.
+	EOF
+	exit 1
+}
+
+while (($#)); do
+	case "$1" in
+	--upf-repo) UPF_REPO="$2" && shift ;;
+	--upf-ref) UPF_REF="$2" && shift ;;
+	--no-fetch) FETCH=0 ;;
+	--avx2-rx) AVX2_RX=(--avx2-rx) ;;
+	-*) usage ;;
+	*) break ;;
+	esac
+	shift
+done
+SUITE="${1:-}"
+TEST="${2:-}"
+[[ "$SUITE" == unary || "$SUITE" == linerate ]] || usage
+[[ "$(hostname -s)" == trex ]] || die "run ptf.sh on the trex node, not $(hostname -s)"
+load_ports
+[[ -n "${PORT0_PEER_MAC:-}" ]] || die "ports.env has no peer MACs; rerun startup.sh"
+
+SRC="$STATE_DIR/src/upf"
+OUT="$STATE_DIR/results/phase2/$(date -u +%Y%m%dT%H%M%SZ)-$SUITE${TEST:+-$TEST}"
+mkdir -p "$OUT"
+log "Results go to $OUT"
+
+# Check out the UPF, discarding the previous run's local config edits.
+if ((FETCH)); then
+	[[ -d "$SRC/.git" ]] || git clone -q "$UPF_REPO" "$SRC"
+	git -C "$SRC" fetch -q "$UPF_REPO" "$UPF_REF"
+	git -C "$SRC" reset -q --hard
+	git -C "$SRC" checkout -q --detach FETCH_HEAD
+fi
+git -C "$SRC" reset -q --hard
+
+# Build the PTF image and BESS Python protobufs if this commit doesn't have them.
+commit="$(git -C "$SRC" rev-parse HEAD)"
+if [[ "$(cat "$STATE_DIR/ptf-image-commit" 2> /dev/null)" != "$commit" ]] ||
+	! docker image inspect bess-upf-ptf > /dev/null 2>&1; then
+	log "Building the PTF image; log in /var/log/upf-testbed/ptf-build.log"
+	make -C "$SRC/ptf" build > /var/log/upf-testbed/ptf-build.log 2>&1 ||
+		die "PTF build failed; see /var/log/upf-testbed/ptf-build.log"
+	echo "$commit" > "$STATE_DIR/ptf-image-commit"
+fi
+
+# Adapt the PTF config to this testbed: TRex's ports and threads, and the MACs
+# of both ends of each link. Keep the repo's DP core count and memory pools.
+cfg="$SRC/ptf/config/trex-cfg-for-ptf.yaml"
+cp "$cfg" "$OUT/trex-cfg-for-ptf.orig.yaml"
+cores="$(python3 -c 'import sys, yaml; print(yaml.safe_load(open(sys.argv[1]))[0]["c"])' "$cfg")"
+python3 "$TESTBED_DIR/scripts/trex-config.py" --cores "$cores" \
+	--memory-from "$OUT/trex-cfg-for-ptf.orig.yaml" "${AVX2_RX[@]}" --out "$cfg" > /dev/null
+# shellcheck disable=SC2153 # PORT1_PEER_MAC comes from ports.env
+sed -i \
+	-e "s/^TREX_SRC_MAC = \"[^\"]*\"/TREX_SRC_MAC = \"$PORT1_MAC\"/" \
+	-e "s/^UPF_CORE_MAC = \"[^\"]*\"/UPF_CORE_MAC = \"$PORT1_PEER_MAC\"/" \
+	-e "s/^UPF_ACCESS_MAC = \"[^\"]*\"/UPF_ACCESS_MAC = \"$PORT0_PEER_MAC\"/" \
+	"$SRC/ptf/tests/linerate/common.py"
+git -C "$SRC" diff > "$OUT/localization.diff"
+
+# ptf_runner.py drives TRex through its daemon, which starts the server with
+# the config above. The PTF container reaches it through docker0.
+"$TESTBED_DIR/scripts/install-trex.sh"
+"$TESTBED_DIR/scripts/trex.sh" stop
+if ! ss -ltn | grep -q ':8090 '; then
+	(cd "$TREX_DIR" && ./trex_daemon_server start) > "$OUT/trex-daemon-start.log" 2>&1 || true
+	sleep 5
+	ss -ltn | grep -q ':8090 ' || {
+		cat "$OUT/trex-daemon-start.log"
+		die "the TRex daemon did not start"
+	}
+fi
+# Keep TRex's control ports off the public control network.
+control="$(ip -o route get 1.1.1.1 | awk '{ for (i = 1; i < NF; i++) if ($i == "dev") print $(i + 1) }')"
+for port in 4500 4501 8090; do
+	iptables -C INPUT -i "$control" -p tcp --dport "$port" -j DROP 2> /dev/null ||
+		iptables -I INPUT -i "$control" -p tcp --dport "$port" -j DROP
+done
+
+upf_ip="$(python3 "$TESTBED_DIR/scripts/manifest.py" ip upf)"
+trex_ip="$(ip -4 -o addr show docker0 | awk '{ split($4, a, "/"); print a[1] }')"
+{
+	echo "upf: $UPF_REPO $UPF_REF $commit"
+	echo "trex server: $(cat "$TREX_DIR/.testbed-version")"
+	echo "UPF_ADDR=$upf_ip:10514 TREX_ADDR=$trex_ip"
+	echo "avx2 rx: ${AVX2_RX[*]:-no (SIMD capped at 128 bits)}"
+	cat "$PORTS_ENV"
+} > "$OUT/host.txt"
+
+log "Running tests/$SUITE${TEST:+ $TEST} against $upf_ip"
+status=0
+(cd "$SRC/ptf" && UPF_ADDR="$upf_ip:10514" TREX_ADDR="$trex_ip" \
+	./run_tests -t "tests/$SUITE" ${TEST:+"$TEST"}) 2>&1 | tee "$OUT/run.log" || status=$?
+
+cp -r "$SRC/ptf/log/." "$OUT/ptf-log/" 2> /dev/null || true
+cp /tmp/trex.txt "$OUT/trex-server.txt" 2> /dev/null || true
+log "Results are in $OUT"
+exit "$status"

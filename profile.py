@@ -43,6 +43,7 @@ pc.defineParameter(
     "wire",
     legalValues=[
         ("wire", "testpmd forwards between the two ports (phase 1)"),
+        ("upf", "host set up for the BESS UPF; start it with upf.sh (phase 2)"),
         ("none", "set up the host only"),
     ],
 )
