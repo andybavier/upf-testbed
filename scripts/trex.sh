@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: Apache-2.0
 #
-# trex.sh start [--cores N] [--memory-from FILE] [--log FILE] | stop
+# trex.sh start [--cores N] [--memory-from FILE] [--log FILE] [--avx2-rx] | stop
 #
 # Run the TRex server in interactive mode on the experiment ports, the way the
 # PTF testbed runs it: software mode, no hardware flow stats.
@@ -11,20 +11,22 @@ source "$(dirname "$0")/lib.sh"
 require_root
 
 start() {
-	local cores=1 memory_from="" logfile=/var/log/upf-testbed/trex.log
+	local cores=1 memory_from="" logfile=/var/log/upf-testbed/trex.log avx2_rx=""
 	while (($#)); do
 		case "$1" in
-		--cores) cores="$2" ;;
-		--memory-from) memory_from="$2" ;;
-		--log) logfile="$2" ;;
+		--cores) cores="$2" && shift ;;
+		--memory-from) memory_from="$2" && shift ;;
+		--log) logfile="$2" && shift ;;
+		# Leave out the SIMD cap that works around trex-core#1182.
+		--avx2-rx) avx2_rx=--avx2-rx ;;
 		*) die "unknown option $1" ;;
 		esac
-		shift 2
+		shift
 	done
 	pgrep -f _t-rex-64 > /dev/null && die "TRex is already running"
 
 	python3 "$TESTBED_DIR/scripts/trex-config.py" --cores "$cores" \
-		${memory_from:+--memory-from "$memory_from"} --out "$TREX_DIR/trex_cfg.yaml"
+		${memory_from:+--memory-from "$memory_from"} $avx2_rx --out "$TREX_DIR/trex_cfg.yaml"
 	(cd "$TREX_DIR" && setsid nohup ./t-rex-64 -i --software --no-hw-flow-stat \
 		--cfg "$TREX_DIR/trex_cfg.yaml" -c "$cores" --iom 0 --no-scapy-server \
 		> "$logfile" 2>&1 < /dev/null &)
@@ -55,5 +57,5 @@ start)
 	start "$@"
 	;;
 stop) stop ;;
-*) die "usage: trex.sh start [--cores N] [--memory-from FILE] [--log FILE] | stop" ;;
+*) die "usage: trex.sh start [--cores N] [--memory-from FILE] [--log FILE] [--avx2-rx] | stop" ;;
 esac

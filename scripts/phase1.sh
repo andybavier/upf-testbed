@@ -20,6 +20,7 @@ PAYLOADS="plain gtpu"
 PPS=10000
 RUNS=2
 DURATION=10
+AVX2_RX=()
 
 usage() {
 	cat <<-EOF
@@ -32,23 +33,26 @@ usage() {
 		  --pps N            packets per second ($PPS)
 		  --runs N           runs per TRex start ($RUNS)
 		  --duration S       seconds per run ($DURATION)
+		  --avx2-rx          leave out the SIMD cap, to check whether TRex still
+		                     needs the trex-core#1182 workaround
 	EOF
 	exit 1
 }
 
 while (($#)); do
 	case "$1" in
-	--upf-repo) UPF_REPO="$2" ;;
-	--upf-ref) UPF_REF="$2" ;;
-	--cores) CORES="$2" ;;
-	--memory) MEMORY="$2" ;;
-	--payloads) PAYLOADS="$2" ;;
-	--pps) PPS="$2" ;;
-	--runs) RUNS="$2" ;;
-	--duration) DURATION="$2" ;;
+	--upf-repo) UPF_REPO="$2" && shift ;;
+	--upf-ref) UPF_REF="$2" && shift ;;
+	--cores) CORES="$2" && shift ;;
+	--memory) MEMORY="$2" && shift ;;
+	--payloads) PAYLOADS="$2" && shift ;;
+	--pps) PPS="$2" && shift ;;
+	--runs) RUNS="$2" && shift ;;
+	--duration) DURATION="$2" && shift ;;
+	--avx2-rx) AVX2_RX=(--avx2-rx) ;;
 	*) usage ;;
 	esac
-	shift 2
+	shift
 done
 
 # CloudLab names each host after its node in profile.py.
@@ -77,6 +81,7 @@ make -C "$SRC/ptf" image > "$OUT/ptf-image.log" 2>&1 ||
 {
 	echo "upf: $UPF_REPO $UPF_REF $(git -C "$SRC" rev-parse HEAD)"
 	echo "trex server: $(cat "$TREX_DIR/.testbed-version")"
+	echo "avx2 rx: ${AVX2_RX[*]:-no (SIMD capped at 128 bits)}"
 	echo "kernel: $(uname -r)"
 	echo "cmdline: $(cat /proc/cmdline)"
 	echo
@@ -112,7 +117,7 @@ for memory in $MEMORY; do
 			log "Running $name"
 			# Restart TRex for every combination so each starts with full pools.
 			if ! "$TESTBED_DIR/scripts/trex.sh" start --cores "$cores" \
-				"${memory_args[@]}" --log "$OUT/trex-$name.log"; then
+				"${memory_args[@]}" "${AVX2_RX[@]}" --log "$OUT/trex-$name.log"; then
 				log "TRex failed to start for $name"
 				continue
 			fi

@@ -109,11 +109,28 @@ bind_ports() {
 	devbind --status-dev net
 }
 
+# DDP profiles change how an Intel 700-series NIC parses packets, and they
+# survive reboots and image reloads until a power cycle. TRex loads one in
+# hardware mode, so a node can arrive with one left by a previous user.
+check_ddp() {
+	[[ "$PORT0_DRIVER" == i40e ]] || return 0
+	local cpus profiles
+	cpus="$(node_cpus "$PORT0_NUMA" | head -n 2 | paste -sd, -)"
+	profiles="$(printf 'ddp get list 0\nddp get list 1\nquit\n' |
+		timeout 60 dpdk-testpmd -l "$cpus" -n 4 -a "$PORT0_PCI" -a "$PORT1_PCI" \
+			--file-prefix ddp-check -- -i 2>&1 | grep -E 'Profile (number|name)')" || true
+	echo "$profiles"
+	if grep -q 'Profile name' <<< "$profiles"; then
+		log "WARNING: a DDP profile is loaded on the experiment ports; power-cycle this node from the CloudLab portal to clear it"
+	fi
+}
+
 install_packages
 enable_iommu
 setup_hugepages
 record_ports
 bind_ports
+check_ddp
 
 case "$ROLE" in
 trex) "$TESTBED_DIR/scripts/install-trex.sh" ;;

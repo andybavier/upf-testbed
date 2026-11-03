@@ -5,7 +5,7 @@
 TESTBED_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 STATE_DIR=/var/lib/upf-testbed
 PORTS_ENV="$STATE_DIR/ports.env"
-TREX_DIR=/opt/trex
+TREX_DIR="${TREX_DIR:-/opt/trex}"
 TREX_VERSION="${TREX_VERSION:-v3.08}"
 
 # Experiment port addresses from profile.py, in TRex port order: port 0 is
