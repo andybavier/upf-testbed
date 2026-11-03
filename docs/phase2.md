@@ -1,5 +1,9 @@
 # Phase 2: PTF tests against a UPF branch
 
+Status: running. On the first run against [omec-project/upf#1331], unary
+passed 5 of 5 and linerate 5 of 6; the one failure is a testbed artifact. See
+[Results](#results).
+
 Phase 2 runs the UPF's PTF unary and linerate suites from the trex node
 against a BESS UPF running in DPDK mode on the upf node, built from any UPF
 branch.
@@ -81,4 +85,32 @@ Results go to `/var/lib/upf-testbed/results/phase2/<timestamp>-<suite>/`:
 `run.log`, the PTF xunit logs, `localization.diff` (the config changes
 above), `host.txt` and the TRex server log.
 
+## Results
+
+First run, 2026-11-03, c220g5 X710s, UPF and PTF image from
+`andybavier/upf` `codex/ptf-framework-modernization` at `cb7a03a4b`, TRex
+v3.08 server with the SIMD cap:
+
+| Suite | Test | Result |
+|---|---|---|
+| unary | `check_rules` PdrTest, FarTest, QerAppTest, QerSessionTest, MetricsTest | 5 passed |
+| linerate | `baseline.DownlinkPerformanceBaselineTest` | passed |
+| linerate | `mbr` DL and UL, conforming and non-conforming | 4 passed |
+| linerate | `qos_metrics.PerFlowQosMetricsTest` | failed: sent 1,000,000, received 1,000,006 |
+
+## Known issues
+
+- **Switch frames break exact packet counts.** The CloudLab switch sends a
+  60-byte multicast frame to each TRex port about every 30 seconds (2 per
+  port per minute on idle links). `qos_metrics` compares TRex's total
+  `opackets` with total `ipackets` over a window of about 100 seconds, so it
+  sees about 6 extra packets and fails. The UPF's kernel side sent nothing
+  during a capture, so the frames don't come from the UPF. The original
+  testbed used direct cables. A fix belongs in the test: count the stream's
+  packets (TRex flow stats or a `pg_id`) instead of port totals.
+- The generated TRex config always gets the SIMD cap from `trex-config.py`,
+  so these runs don't by themselves check the `ext_dpdk_opt` line in the
+  branch's own `trex-cfg-for-ptf.yaml`.
+
 [trex-core#1182]: https://github.com/cisco-system-traffic-generator/trex-core/issues/1182
+[omec-project/upf#1331]: https://github.com/omec-project/upf/pull/1331

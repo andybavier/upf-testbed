@@ -107,7 +107,11 @@ is in this testbed's TRex config and in the UPF's PTF config
 ([omec-project/upf#1331]). Details, the version bisect and known issues are in
 [phase1.md](phase1.md).
 
-### Phase 2: PTF unary and linerate against a UPF branch
+### Phase 2: PTF unary and linerate against a UPF branch (running)
+
+First run on #1331: unary 5/5, linerate 5/6, with the one failure caused by
+CloudLab switch frames in an exact packet count. See [phase2.md](phase2.md).
+
 
 Replace `testpmd` with the BESS UPF in DPDK mode. Run `ptf/run_tests` for the
 unary and linerate suites on `main` and on the #1331 branch.
