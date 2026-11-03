@@ -105,8 +105,8 @@ v3.08 server with the SIMD cap:
   port per minute on idle links). `qos_metrics` compares TRex's total
   `opackets` with total `ipackets` over a window of about 100 seconds, so it
   sees about 6 extra packets and fails. The UPF's kernel side sent nothing
-  during a capture, so the frames don't come from the UPF. The original
-  testbed used direct cables. A fix belongs in the test: count the stream's
+  during a capture, so the frames don't come from the UPF. A testbed with
+  direct cables wouldn't see them. A fix belongs in the test: count the stream's
   packets (TRex flow stats or a `pg_id`) instead of port totals.
 - The generated TRex config always gets the SIMD cap from `trex-config.py`,
   so these runs don't by themselves check the `ext_dpdk_opt` line in the
