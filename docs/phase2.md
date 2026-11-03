@@ -145,6 +145,8 @@ passed in the first run.
   - The PTF branch doesn't change the dataplane, so this is UPF behavior,
     not a regression from #1331. To check `baseline` itself, run it on a
     freshly started UPF (`upf.sh start`).
+  - On a freshly started UPF, `baseline` passed at the #1331 branch head
+    `7a94d6fae` (merged with current `main`).
 - The generated TRex config always gets the SIMD cap from `trex-config.py`,
   so these runs don't by themselves check the `ext_dpdk_opt` line in the
   branch's own `trex-cfg-for-ptf.yaml`.
