@@ -98,6 +98,12 @@ v3.08 server with the SIMD cap:
 | linerate | `mbr` DL and UL, conforming and non-conforming | 4 passed |
 | linerate | `qos_metrics.PerFlowQosMetricsTest` | failed: sent 1,000,000, received 1,000,006 |
 
+After `qos_metrics` was changed to count its own stream (`8d157619d`, below),
+it passed alone and in the full suite. In that full run and three more runs of
+`baseline` alone, `baseline` failed 3 of 4 times on its 99.9th percentile
+latency check: 2000 µs against a 1000 µs limit. That test didn't change, and it
+passed in the first run.
+
 ## Known issues
 
 - **Switch frames break exact packet counts.** The CloudLab switch sends a
@@ -106,8 +112,16 @@ v3.08 server with the SIMD cap:
   `opackets` with total `ipackets` over a window of about 100 seconds, so it
   sees about 6 extra packets and fails. The UPF's kernel side sent nothing
   during a capture, so the frames don't come from the UPF. A testbed with
-  direct cables wouldn't see them. A fix belongs in the test: count the stream's
-  packets (TRex flow stats or a `pg_id`) instead of port totals.
+  direct cables wouldn't see them. Fixed in the test (`8d157619d` on the
+  #1331 branch): it now counts its own stream with `STLFlowLatencyStats`, as
+  `baseline` and `mbr` do. Plain `STLFlowStats` doesn't work here, because it
+  tags the IP header, which the UPF's GTP-U encapsulation replaces; it
+  matched only 15 of 1,000,000 packets.
+- **`baseline` tail latency is marginal.** Its 99.9th percentile lands in
+  TRex's 1–2 ms histogram bucket on most runs, so the test fails at "2000 µs".
+  Likely causes, not yet checked: no CPU isolation on CloudLab nodes
+  (`isolcpus`, `nohz_full`), BESS and TRex threads sharing cores with their
+  hyperthread siblings or system work, and TRex software mode's own latency.
 - The generated TRex config always gets the SIMD cap from `trex-config.py`,
   so these runs don't by themselves check the `ext_dpdk_opt` line in the
   branch's own `trex-cfg-for-ptf.yaml`.

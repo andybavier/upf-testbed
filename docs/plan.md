@@ -109,8 +109,9 @@ is in this testbed's TRex config and in the UPF's PTF config
 
 ### Phase 2: PTF unary and linerate against a UPF branch (running)
 
-First run on #1331: unary 5/5, linerate 5/6, with the one failure caused by
-CloudLab switch frames in an exact packet count. See [phase2.md](phase2.md).
+On #1331: unary 5/5. In linerate, `qos_metrics` failed on CloudLab switch
+frames until the test counted its own stream, and `baseline` fails its 99.9th
+percentile latency check on most runs. See [phase2.md](phase2.md).
 
 
 Replace `testpmd` with the BESS UPF in DPDK mode. Run `ptf/run_tests` for the

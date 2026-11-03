@@ -14,7 +14,8 @@ The testbed has two goals:
 Status: phase 1 is done. It found that TRex v3.05 and later stop receiving on
 Intel i40e NICs, and the testbed's TRex config works around it
 ([details](docs/phase1.md#findings)). Phase 2, the PTF tests against a real
-UPF, runs: on PR #1331, unary passes 5/5 and linerate 5/6
+UPF, runs: on PR #1331, unary passes 5/5; in linerate, `qos_metrics` needed a
+test fix and `baseline` fails its tail-latency check on most runs
 ([docs/phase2.md](docs/phase2.md)). See
 [docs/plan.md](docs/plan.md) for the plan.
 
