@@ -9,9 +9,10 @@ import time
 
 sys.path.insert(0, sys.argv[1] + "/automation/trex_control_plane/interactive")
 
-from scapy.layers.inet import IP, UDP  # noqa: E402
-from scapy.layers.l2 import Ether  # noqa: E402
+# The TRex client puts its bundled Scapy on the path, so import it first.
 from trex.stl.api import STLClient, STLPktBuilder, STLStream, STLTXCont  # noqa: E402
+from scapy.layers.inet import IP, UDP  # noqa: E402, I001
+from scapy.layers.l2 import Ether  # noqa: E402
 
 PPS = 10000
 DURATION = 10
