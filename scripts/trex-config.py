@@ -55,6 +55,11 @@ def main() -> None:
         "--memory-from",
         help="copy the memory section from this TRex config, e.g. the PTF one",
     )
+    parser.add_argument(
+        "--avx2-rx",
+        action="store_true",
+        help="let DPDK pick its AVX2 receive path (stalls i40e on TRex v3.05+)",
+    )
     parser.add_argument("--out", required=True)
     args = parser.parse_args()
 
@@ -82,6 +87,13 @@ def main() -> None:
             "dual_if": [{"socket": node, "threads": cpus[2 : 2 + args.cores]}],
         },
     }
+    if not args.avx2_rx:
+        # From v3.05, TRex's DPDK picks the i40e AVX2 receive function on
+        # AVX2 CPUs, but TRex builds it as a stub that returns no packets, so
+        # each receive ring fills once and stalls. Capping SIMD at 128 bits
+        # selects the SSE path instead. See cisco-system-traffic-generator/
+        # trex-core#1182.
+        config["ext_dpdk_opt"] = ["--force-max-simd-bitwidth=128"]
     if args.memory_from:
         with open(args.memory_from) as f:
             config["memory"] = yaml.safe_load(f)[0]["memory"]
