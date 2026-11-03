@@ -11,9 +11,10 @@ The testbed has two goals:
 2. Give contributors a repeatable environment for testing larger UPF changes,
    such as the control-plane refactor in [omec-project/upf#1292].
 
-Status: phase 1 (TRex through a `testpmd` wire) is ready to try. See
-[docs/plan.md](docs/plan.md) for the plan and [docs/phase1.md](docs/phase1.md)
-to run it.
+Status: phase 1 is done. It found that TRex v3.05 and later stop receiving on
+Intel i40e NICs, and the testbed's TRex config works around it
+([details](docs/phase1.md#findings)). Phase 2, the PTF tests against a real
+UPF, is next. See [docs/plan.md](docs/plan.md) for the plan.
 
 ## Layout
 
@@ -26,6 +27,8 @@ to run it.
 | `scripts/trex-config.py` | Writes a TRex config from the host's ports and NUMA layout |
 | `scripts/wire.sh` | Runs `testpmd` as a wire on the upf node |
 | `scripts/phase1.sh` | Runs the phase 1 receive tests and summarizes them |
+| `scripts/trex-rx-check.sh` | Checks whether any TRex release receives on this host, using its own client |
+| `scripts/rx-check.py` | The client side of `trex-rx-check.sh` |
 
 [omec-project/upf#1331]: https://github.com/omec-project/upf/pull/1331
 [omec-project/upf#1292]: https://github.com/omec-project/upf/issues/1292

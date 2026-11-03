@@ -59,19 +59,33 @@ cluster.
 - `profile.py`: a geni-lib profile with parameters for node type, OS image,
   number of links, and whether to add the `core` node. CloudLab can create a
   profile from this repository, so changes are a `git push`.
-- `scripts/setup-common.sh`: hugepages (1 GB pages if available), IOMMU
-  (`intel_iommu=on iommu=pt`, then reboot) or vfio no-IOMMU mode, Docker, and
-  tools. It finds the experiment interfaces by their CloudLab IP addresses and
-  never touches the control interface. Safe to re-run.
-- `scripts/setup-trex.sh`: TRex v3.08 in `/opt/trex`, its TRex config written
-  from the real PCI addresses and NUMA node, and the TRex daemon on port 8090.
-  Carries over what the GHA repro learned: the intermediate certificate for
-  `trex-tgn.cisco.com`, `--no-scapy-server`, and removing TRex's bundled
-  `libstdc++`.
+Built in phase 1:
+
+- `scripts/startup.sh`: the startup service on every node. Turns on the IOMMU
+  (`intel_iommu=on iommu=pt`, then one reboot), sets up 2 MB hugepages, finds
+  the experiment ports by their CloudLab addresses (never the control
+  interface), records them in `/var/lib/upf-testbed/ports.env`, binds them to
+  vfio-pci, warns about leftover DDP profiles, then sets up the node's role.
+  Safe to re-run.
+- `scripts/install-trex.sh`: a TRex release in `/opt/trex`, with what the GHA
+  repro learned: the intermediate certificate for `trex-tgn.cisco.com` and
+  removing TRex's bundled `libstdc++`.
+- `scripts/trex-config.py` and `scripts/trex.sh`: a TRex config from the real
+  PCI addresses and NUMA layout, with the SIMD cap for [trex-core#1182], and
+  starting and stopping TRex the way the PTF testbed runs it.
+- `scripts/wire.sh`: DPDK `testpmd` in io-forward mode between the two ports,
+  used instead of the UPF in phase 1.
+- `scripts/phase1.sh` and `scripts/trex-rx-check.sh`: the phase 1 matrix, and
+  a receive check for any TRex release with its own client.
+
+Still to build:
+
 - `scripts/setup-upf.sh`: clones the UPF at a given ref, builds its images,
   binds the experiment ports to vfio-pci and writes `upf.jsonc` for DPDK mode.
-- `scripts/setup-wire.sh`: DPDK `testpmd` in io-forward mode between the two
-  ports, used instead of the UPF in phase 1.
+- The TRex daemon on port 8090, which `ptf_runner.py` uses to push
+  `ptf/config/trex-cfg-for-ptf.yaml` and start TRex. That config hardcodes
+  the old testbed's PCI addresses, MACs and threads, so phase 2 needs a
+  version generated for this host.
 - `testbed`: one entry point, for example
   `testbed run unary|linerate|integration --ref <branch>`. It builds that
   branch, runs the suite, and copies xunit results, TRex and BESS logs and
@@ -81,15 +95,18 @@ cluster.
 
 ## Phases
 
-### Phase 1: TRex receive path on real NICs
+### Phase 1: TRex receive path on real NICs (done)
 
-Use `testpmd` as the wire on the `upf` node. Run the TRex receive repro from
-the UPF scratch branch (`ptf/trex-rx-repro.py`) with `c: 1` and `c: 2`, plain
-and GTP-U payloads, on X710 and X520.
+Used `testpmd` as the wire on the `upf` node and ran the TRex receive repro
+from the UPF scratch branch (`ptf/trex-rx-repro.py`) with 1 and 2 DP cores,
+plain and GTP-U payloads, on c220g5 X710s.
 
-Done when we know whether TRex v3.08 in software mode receives everything in
-both single-queue and multi-queue modes on X710. Record per-queue xstats and
-per-thread CPU use for each run.
+Result: TRex v3.05 and later stop receiving on i40e NICs once each RX ring
+fills, because DPDK 24.03 selects an AVX2 receive function that TRex builds
+as a stub ([trex-core#1182]). Capping DPDK at 128-bit SIMD fixes it; the cap
+is in this testbed's TRex config and in the UPF's PTF config
+([omec-project/upf#1331]). Details, the version bisect and known issues are in
+[phase1.md](phase1.md).
 
 ### Phase 2: PTF unary and linerate against a UPF branch
 
@@ -117,9 +134,11 @@ scenarios through the UPF.
 ## Open questions
 
 - Can both X710 ports on c6420 carry experiment links?
-- Do CloudLab's switches pass arbitrary MAC addresses and GTP-U on experiment
-  links without changes? TRex ports run in promiscuous mode, and the switches
-  should only see unicast to known MACs, but this needs checking.
+- CloudLab's switches learn MAC addresses, so a frame addressed to a MAC
+  already seen on its own ingress port is dropped. Phase 1's GTP-U repro
+  likely hit this. In phase 2 TRex and the UPF have distinct MACs on each
+  link, which should avoid it, but check the PTF MAC constants against the
+  real ports.
 - Where should this live long term? Start here, then propose a
   `testbed/cloudlab/` directory upstream once it works.
 - Whether to run tests from GHA. A self-hosted runner on a long-lived
@@ -128,3 +147,4 @@ scenarios through the UPF.
 
 [omec-project/upf#1331]: https://github.com/omec-project/upf/pull/1331
 [omec-project/upf#1292]: https://github.com/omec-project/upf/issues/1292
+[trex-core#1182]: https://github.com/cisco-system-traffic-generator/trex-core/issues/1182
