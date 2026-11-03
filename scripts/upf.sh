@@ -50,6 +50,8 @@ build() {
 	log "Building upf-bess and upf-pfcp from $UPF_REPO $UPF_REF ($(git -C "$SRC" rev-parse --short HEAD)); log in $LOGDIR/upf-build.log"
 	make -C "$SRC" docker-build > "$LOGDIR/upf-build.log" 2>&1 ||
 		die "build failed; see $LOGDIR/upf-build.log"
+	# The images carry no commit label, so remember which commit they're from.
+	echo "$UPF_REPO $UPF_REF $(git -C "$SRC" rev-parse HEAD)" > "$STATE_DIR/upf-image-commit"
 	log "Built upf-bess:$(image_tag) and upf-pfcp:$(image_tag)"
 }
 
@@ -138,9 +140,11 @@ start() {
 		--entrypoint /route_control.py \
 		"upf-bess:$tag" -i "${IFACES[@]}" > /dev/null
 	log "UPF is up on CPUs $cpus: access ${PORT0_PCI}, core ${PORT1_PCI}; BESS gRPC on port $BESSD_PORT"
+	log "Images built from: $(cat "$STATE_DIR/upf-image-commit" 2> /dev/null || echo unknown)"
 }
 
 status() {
+	echo "images built from: $(cat "$STATE_DIR/upf-image-commit" 2> /dev/null || echo unknown)"
 	docker ps --filter name=bess --filter name=pause --format '{{.Names}}\t{{.Status}}'
 	docker exec bess ./bessctl show port 2> /dev/null || true
 }
