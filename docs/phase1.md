@@ -13,8 +13,9 @@ TRex sends on port 1 (core) comes back on port 0 (access).
 
 1. In CloudLab, create a profile from this repository (Experiments → Create
    Experiment Profile → Git Repo, `https://github.com/andybavier/upf-testbed`).
-2. Instantiate it. Pick the node type: `c6420` (Clemson, X710) to match the
-   #1331 testbed, or `c220g5` (Wisconsin, X520). Leave the UPF role at `wire`.
+2. Instantiate it. Pick the node type. `c220g5` (Wisconsin) worked and had
+   X710 NICs, the same family as the #1331 testbed. `c6420` (Clemson) is
+   untested. Leave the UPF role at `wire`.
 3. Wait for both nodes' startup services to finish. Each node reboots once to
    turn on the IOMMU. Progress is in `/var/log/upf-testbed/startup.log`.
 

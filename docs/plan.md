@@ -48,7 +48,7 @@ and gives the UPF real L3 neighbors.
 | Node type | Cluster | NIC | Notes |
 |---|---|---|---|
 | c6420 | Clemson | Intel X710 10G, dual-port (i40e) | Same NIC family as the #1331 testbed. Two sockets. Need to confirm both ports can be used for experiment links. |
-| c220g5 | Wisconsin | Intel X520-DA2 10G, dual-port (ixgbe) | Both ports available for experiments. Many nodes. |
+| c220g5 | Wisconsin | Intel X710 10G, dual-port (i40e), firmware 8.50 | CloudLab's hardware page says X520, but the nodes we got had X710s with both ports usable for experiments. Many nodes. |
 | c6620 | Utah | Intel E810 25G/100G (ice) | One port of each speed for experiments; a later option. |
 
 The node type is a profile parameter. Both nodes must come from the same

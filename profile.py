@@ -21,11 +21,12 @@ pc.defineParameter(
     portal.ParameterType.NODETYPE,
     "c220g5",
     legalValues=[
-        ("c220g5", "c220g5 (Wisconsin, Intel X520 10G)"),
-        ("c6420", "c6420 (Clemson, Intel X710 10G)"),
+        ("c220g5", "c220g5 (Wisconsin, Intel X710 10G)"),
+        ("c6420", "c6420 (Clemson, Intel X710 10G, untested)"),
     ],
     longDescription="Both nodes use this type. Each needs two experiment "
-    "ports on its DPDK NIC.",
+    "ports on its DPDK NIC. CloudLab's hardware page lists an X520 for "
+    "c220g5, but the nodes we got had a dual-port X710.",
 )
 pc.defineParameter(
     "osImage",

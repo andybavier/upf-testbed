@@ -15,16 +15,22 @@ mkdir -p "$STATE_DIR" /var/log/upf-testbed
 exec > >(tee -a /var/log/upf-testbed/startup.log) 2>&1
 log "startup.sh $ROLE"
 
+# dpdk has dpdk-devbind.py; dpdk-dev has dpdk-testpmd.
+PACKAGES=(dpdk dpdk-dev docker.io ethtool jq numactl pciutils python3-yaml)
+
 install_packages() {
-	[[ -f "$STATE_DIR/packages-done" ]] && return
+	# Check the packages rather than a marker, so adding one to the list
+	# installs it on the next boot or rerun.
+	dpkg -s "${PACKAGES[@]}" > /dev/null 2>&1 && return
 	export DEBIAN_FRONTEND=noninteractive
 	apt-get update -q
-	apt-get install -q -y dpdk docker.io ethtool jq numactl pciutils python3-yaml
+	apt-get install -q -y "${PACKAGES[@]}"
 	# Let the experiment user run docker without sudo.
 	local user
 	user="$(geni-get user_urn 2>/dev/null | awk -F+ '{ print $NF }')" || true
-	[[ -n "$user" ]] && usermod -aG docker "$user"
-	touch "$STATE_DIR/packages-done"
+	if [[ -n "$user" ]]; then
+		usermod -aG docker "$user"
+	fi
 }
 
 enable_iommu() {
