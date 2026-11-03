@@ -104,6 +104,10 @@ it passed alone and in the full suite. In that full run and three more runs of
 latency check: 2000 µs against a 1000 µs limit. That test didn't change, and it
 passed in the first run.
 
+Final run, 2026-11-03, with the UPF images and PTF image both built from the
+#1331 branch at `7a94d6fae` (merged with current `main`), each suite on a
+freshly started UPF: unary 5/5, linerate 6/6.
+
 ## Known issues
 
 - **Switch frames break exact packet counts.** The CloudLab switch sends a
