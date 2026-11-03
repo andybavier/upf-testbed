@@ -117,11 +117,34 @@ passed in the first run.
   `baseline` and `mbr` do. Plain `STLFlowStats` doesn't work here, because it
   tags the IP header, which the UPF's GTP-U encapsulation replaces; it
   matched only 15 of 1,000,000 packets.
-- **`baseline` tail latency is marginal.** Its 99.9th percentile lands in
-  TRex's 1–2 ms histogram bucket on most runs, so the test fails at "2000 µs".
-  Likely causes, not yet checked: no CPU isolation on CloudLab nodes
-  (`isolcpus`, `nohz_full`), BESS and TRex threads sharing cores with their
-  hyperthread siblings or system work, and TRex software mode's own latency.
+- **`baseline` fails its tail-latency check on a UPF that has already served
+  test runs.** Investigated 2026-11-03:
+  - CPU pinning is as upstream intends: `upf.sh` gives the `bess` container
+    two NUMA-local CPUs, like `docker_setup.sh`'s `--cpuset-cpus`, and
+    `up4.bess` pins the busy-polling worker to the first. Host isolation
+    (`isolcpus`, `nohz_full`) isn't part of the documented setup. It isn't
+    the cause either: during a run, TRex's RX and DP threads were preempted
+    5–20 times and BESS's worker about 3.6 times a second, each for
+    microseconds.
+  - The slow packets, 0.1–0.2% at 1–3 ms, come at the start of the traffic.
+    TRex leaves start-up spikes out of `total_max` (335 µs) but keeps them in
+    the histogram, which the test's percentiles use. 99.9% of packets take
+    under 50 µs.
+  - Sending the same traffic a second time in the same test was clean (23
+    packets ≥ 1 ms, 99.9th percentile 60 µs), so it's a cold-flow effect.
+  - It gets worse as the UPF serves more runs. After `upf.sh start`, three
+    back-to-back runs gave a 99.9th percentile of 60, 300, then 2000 µs
+    (125, 120, then 1,178 packets ≥ 1 ms). The first run of the session
+    also passed on a fresh UPF.
+  - Suspect, not yet shown: per-flow state in BESS's `FlowMeasure` modules,
+    whose tables are only flipped and cleared when something reads session
+    stats (normally a Prometheus scrape of the PFCP agent). Scraping
+    `/metrics` between runs can't be used as a workaround: it flips the
+    buffer behind the test, whose own read then fails with "refusing to read
+    active buffer".
+  - The PTF branch doesn't change the dataplane, so this is UPF behavior,
+    not a regression from #1331. To check `baseline` itself, run it on a
+    freshly started UPF (`upf.sh start`).
 - The generated TRex config always gets the SIMD cap from `trex-config.py`,
   so these runs don't by themselves check the `ext_dpdk_opt` line in the
   branch's own `trex-cfg-for-ptf.yaml`.
