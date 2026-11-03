@@ -56,6 +56,10 @@ OUT="$STATE_DIR/results/phase1/$(date -u +%Y%m%dT%H%M%SZ)"
 mkdir -p "$OUT"
 log "Results go to $OUT"
 
+# Installs TRex if the startup service didn't; does nothing if it did.
+"$TESTBED_DIR/scripts/install-trex.sh"
+[[ -x "$TREX_DIR/t-rex-64" ]] || die "TRex is not installed in $TREX_DIR"
+
 # Check out the UPF and build its PTF image.
 if [[ ! -d "$SRC/.git" ]]; then
 	git clone -q "$UPF_REPO" "$SRC"
