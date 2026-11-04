@@ -23,7 +23,7 @@ usage() {
 		  --upf-repo URL   UPF repository ($UPF_REPO)
 		  --upf-ref REF    branch or commit to test ($UPF_REF)
 		  --no-fetch       test the checkout as it is
-		  --avx2-rx        leave out the trex-core#1182 SIMD cap
+		  --avx2-rx        remove the trex-core#1182 SIMD cap, even the branch's
 		TEST is a test file or file.TestCase within the suite, e.g. baseline.
 	EOF
 	exit 1
@@ -72,12 +72,18 @@ if [[ "$(cat "$STATE_DIR/ptf-image-commit" 2> /dev/null)" != "$commit" ]] ||
 fi
 
 # Adapt the PTF config to this testbed: TRex's ports and threads, and the MACs
-# of both ends of each link. Keep the repo's DP core count and memory pools.
+# of both ends of each link. Keep the repo's DP core count, memory pools and
+# DPDK options (the trex-core#1182 SIMD cap); older branches without the cap
+# get the testbed's.
 cfg="$SRC/ptf/config/trex-cfg-for-ptf.yaml"
-cp "$cfg" "$OUT/trex-cfg-for-ptf.orig.yaml"
-cores="$(python3 -c 'import sys, yaml; print(yaml.safe_load(open(sys.argv[1]))[0]["c"])' "$cfg")"
-python3 "$TESTBED_DIR/scripts/trex-config.py" --cores "$cores" \
-	--memory-from "$OUT/trex-cfg-for-ptf.orig.yaml" "${AVX2_RX[@]}" --out "$cfg" > /dev/null
+orig="$OUT/trex-cfg-for-ptf.orig.yaml"
+cp "$cfg" "$orig"
+read -r cores simd_cap < <(python3 -c '
+import sys, yaml
+c = yaml.safe_load(open(sys.argv[1]))[0]
+print(c["c"], "branch" if "ext_dpdk_opt" in c else "testbed")' "$orig")
+python3 "$TESTBED_DIR/scripts/trex-config.py" --cores "$cores" --memory-from "$orig" \
+	--dpdk-opts-from "$orig" "${AVX2_RX[@]}" --out "$cfg" > /dev/null
 # shellcheck disable=SC2153 # PORT1_PEER_MAC comes from ports.env
 sed -i \
 	-e "s/^TREX_SRC_MAC = \"[^\"]*\"/TREX_SRC_MAC = \"$PORT1_MAC\"/" \
@@ -111,7 +117,11 @@ trex_ip="$(ip -4 -o addr show docker0 | awk '{ split($4, a, "/"); print a[1] }')
 	echo "upf: $UPF_REPO $UPF_REF $commit"
 	echo "trex server: $(cat "$TREX_DIR/.testbed-version")"
 	echo "UPF_ADDR=$upf_ip:10514 TREX_ADDR=$trex_ip"
-	echo "avx2 rx: ${AVX2_RX[*]:-no (SIMD capped at 128 bits)}"
+	if ((${#AVX2_RX[@]})); then
+		echo "SIMD cap: removed (--avx2-rx)"
+	else
+		echo "SIMD cap: from the $simd_cap config"
+	fi
 	cat "$PORTS_ENV"
 } > "$OUT/host.txt"
 

@@ -18,6 +18,9 @@ import yaml
 UPF_ACCESS_MAC = "40:a6:b7:20:4f:b8"
 UPF_CORE_MAC = "40:a6:b7:20:4f:b9"
 
+SIMD_OPT = "--force-max-simd-bitwidth"
+SIMD_CAP = f"{SIMD_OPT}=128"
+
 
 def read_ports(path: str) -> dict[str, str]:
     ports = {}
@@ -54,6 +57,11 @@ def main() -> None:
     parser.add_argument(
         "--memory-from",
         help="copy the memory section from this TRex config, e.g. the PTF one",
+    )
+    parser.add_argument(
+        "--dpdk-opts-from",
+        help="use the ext_dpdk_opt list from this TRex config, if it has one,"
+        " instead of adding the SIMD cap",
     )
     parser.add_argument(
         "--avx2-rx",
@@ -95,13 +103,22 @@ def main() -> None:
             "dual_if": [{"socket": node, "threads": cpus[2 : 2 + args.cores]}],
         },
     }
-    if not args.avx2_rx:
-        # From v3.05, TRex's DPDK picks the i40e AVX2 receive function on
-        # AVX2 CPUs, but TRex builds it as a stub that returns no packets, so
-        # each receive ring fills once and stalls. Capping SIMD at 128 bits
-        # selects the SSE path instead. See cisco-system-traffic-generator/
-        # trex-core#1182.
-        config["ext_dpdk_opt"] = ["--force-max-simd-bitwidth=128"]
+    # From v3.05, TRex's DPDK picks the i40e AVX2 receive function on AVX2
+    # CPUs, but TRex builds it as a stub that returns no packets, so each
+    # receive ring fills once and stalls. Capping SIMD at 128 bits selects the
+    # SSE path instead. See cisco-system-traffic-generator/trex-core#1182.
+    # The UPF's PTF config carries the cap since omec-project/upf#1331, so
+    # keep that config's options when it has them; older configs get the cap.
+    dpdk_opts = None
+    if args.dpdk_opts_from:
+        with open(args.dpdk_opts_from) as f:
+            dpdk_opts = yaml.safe_load(f)[0].get("ext_dpdk_opt")
+    if dpdk_opts is None:
+        dpdk_opts = [SIMD_CAP]
+    if args.avx2_rx:
+        dpdk_opts = [o for o in dpdk_opts if not o.startswith(SIMD_OPT)]
+    if dpdk_opts:
+        config["ext_dpdk_opt"] = dpdk_opts
     if args.memory_from:
         with open(args.memory_from) as f:
             config["memory"] = yaml.safe_load(f)[0]["memory"]
