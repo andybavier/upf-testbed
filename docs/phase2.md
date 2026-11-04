@@ -1,8 +1,9 @@
 # Phase 2: PTF tests against a UPF branch
 
-Status: running. On the first run against [omec-project/upf#1331], unary
-passed 5 of 5 and linerate 5 of 6; the one failure is a testbed artifact. See
-[Results](#results).
+Status: done. Both suites pass against the PTF changes in
+[omec-project/upf#1331], now merged upstream as `84bba45a3`: unary 5/5 and
+linerate 6/6, with `baseline` on a freshly started UPF. See
+[Results](#results) and [Known issues](#known-issues).
 
 Phase 2 runs the UPF's PTF unary and linerate suites from the trex node
 against a BESS UPF running in DPDK mode on the upf node, built from any UPF
@@ -34,15 +35,17 @@ cd /local/repository && sudo git pull && sudo ./scripts/startup.sh wire
 
 ## Start the UPF
 
-On the upf node, build the images from the branch under test, then start it:
+On the upf node, build the images, then start the UPF:
 
 ```bash
-sudo /local/repository/scripts/upf.sh build --repo https://github.com/andybavier/upf --ref codex/ptf-framework-modernization
+sudo /local/repository/scripts/upf.sh build
 sudo /local/repository/scripts/upf.sh start
 sudo /local/repository/scripts/upf.sh status
 ```
 
-The build compiles BESS from source and takes a while; its log is
+`build` uses upstream `main` by default; to test a branch, add
+`--repo https://github.com/<you>/upf --ref <branch>`. The build compiles BESS
+from source and takes a while; its log is
 `/var/log/upf-testbed/upf-build.log`. `start` mirrors the UPF's
 `scripts/docker_setup.sh`:
 
@@ -65,18 +68,21 @@ a firewall rule only lets the trex node reach them.
 On the trex node:
 
 ```bash
-sudo /local/repository/scripts/ptf.sh --upf-repo https://github.com/andybavier/upf --upf-ref codex/ptf-framework-modernization unary
-sudo /local/repository/scripts/ptf.sh --upf-repo https://github.com/andybavier/upf --upf-ref codex/ptf-framework-modernization linerate
+sudo /local/repository/scripts/ptf.sh unary
+sudo /local/repository/scripts/ptf.sh linerate
 ```
 
-Add a test name to run one, e.g. `linerate baseline`. `ptf.sh` checks out the
-branch, builds the PTF image when the commit changes, adapts the PTF config to
-this testbed (what step 1 of `ptf/README.md` asks for), starts the TRex
-daemon, and runs `ptf/run_tests`:
+Add a test name to run one, e.g. `linerate baseline`. As with `upf.sh build`,
+`--upf-repo` and `--upf-ref` select a branch; use the same one on both nodes.
+`ptf.sh` checks out the branch, builds the PTF image when the commit changes,
+adapts the PTF config to this testbed (what step 1 of `ptf/README.md` asks
+for), starts the TRex daemon, and runs `ptf/run_tests`:
 
 - `ptf/config/trex-cfg-for-ptf.yaml` gets this host's PCI addresses, MACs and
-  threads, keeping the branch's DP core count and memory pools, plus the
-  [trex-core#1182] SIMD cap;
+  threads, keeping the branch's DP core count, memory pools and DPDK options.
+  Branches from before #1331 lack the [trex-core#1182] SIMD cap, so they get
+  the testbed's; `host.txt` records which applied, and `--avx2-rx` removes
+  it;
 - `ptf/tests/linerate/common.py` gets the real TRex and UPF MACs;
 - `UPF_ADDR` and `TREX_ADDR` point at the upf node and the local TRex
   daemon.
@@ -87,9 +93,13 @@ above), `host.txt` and the TRex server log.
 
 ## Results
 
-First run, 2026-11-03, c220g5 X710s, UPF and PTF image from
-`andybavier/upf` `codex/ptf-framework-modernization` at `cb7a03a4b`, TRex
-v3.08 server with the SIMD cap:
+All runs used c220g5 X710s and a TRex v3.08 server with the SIMD cap. The
+commits below are on the #1331 PR branch (`andybavier/upf`
+`codex/ptf-framework-modernization`), which was squash-merged upstream as
+`84bba45a3`.
+
+First run, 2026-11-03, UPF and PTF image from an early revision of the
+branch, before its commits were rewritten to add DCO sign-offs:
 
 | Suite | Test | Result |
 |---|---|---|
@@ -98,15 +108,16 @@ v3.08 server with the SIMD cap:
 | linerate | `mbr` DL and UL, conforming and non-conforming | 4 passed |
 | linerate | `qos_metrics.PerFlowQosMetricsTest` | failed: sent 1,000,000, received 1,000,006 |
 
-After `qos_metrics` was changed to count its own stream (`8d157619d`, below),
+After `qos_metrics` was changed to count its own stream (`a05d2fdd7`, below),
 it passed alone and in the full suite. In that full run and three more runs of
 `baseline` alone, `baseline` failed 3 of 4 times on its 99.9th percentile
 latency check: 2000 µs against a 1000 µs limit. That test didn't change, and it
 passed in the first run.
 
 Final run, 2026-11-03, with the UPF images and PTF image both built from the
-#1331 branch at `7a94d6fae` (merged with current `main`), each suite on a
-freshly started UPF: unary 5/5, linerate 6/6.
+branch at `7a94d6fae` (merged with `main`), each suite on a freshly started
+UPF: unary 5/5, linerate 6/6. Apart from `ptf/README.md` and
+`.wordlist.txt`, that commit's tree is identical to upstream `84bba45a3`.
 
 ## Known issues
 
@@ -116,11 +127,11 @@ freshly started UPF: unary 5/5, linerate 6/6.
   `opackets` with total `ipackets` over a window of about 100 seconds, so it
   sees about 6 extra packets and fails. The UPF's kernel side sent nothing
   during a capture, so the frames don't come from the UPF. A testbed with
-  direct cables wouldn't see them. Fixed in the test (`8d157619d` on the
-  #1331 branch): it now counts its own stream with `STLFlowLatencyStats`, as
-  `baseline` and `mbr` do. Plain `STLFlowStats` doesn't work here, because it
-  tags the IP header, which the UPF's GTP-U encapsulation replaces; it
-  matched only 15 of 1,000,000 packets.
+  direct cables wouldn't see them. Fixed in the test (`a05d2fdd7` on the
+  #1331 branch, upstream in `84bba45a3`): it now counts its own stream with
+  `STLFlowLatencyStats`, as `baseline` and `mbr` do. Plain `STLFlowStats`
+  doesn't work here, because it tags the IP header, which the UPF's GTP-U
+  encapsulation replaces; it matched only 15 of 1,000,000 packets.
 - **`baseline` fails its tail-latency check on a UPF that has already served
   test runs** ([omec-project/upf#1392]). Investigated 2026-11-03:
   - CPU pinning is as upstream intends: `upf.sh` gives the `bess` container
@@ -150,10 +161,7 @@ freshly started UPF: unary 5/5, linerate 6/6.
     not a regression from #1331. To check `baseline` itself, run it on a
     freshly started UPF (`upf.sh start`).
   - On a freshly started UPF, `baseline` passed at the #1331 branch head
-    `7a94d6fae` (merged with current `main`).
-- The generated TRex config always gets the SIMD cap from `trex-config.py`,
-  so these runs don't by themselves check the `ext_dpdk_opt` line in the
-  branch's own `trex-cfg-for-ptf.yaml`.
+    `7a94d6fae` (merged with `main`).
 
 [trex-core#1182]: https://github.com/cisco-system-traffic-generator/trex-core/issues/1182
 [omec-project/upf#1331]: https://github.com/omec-project/upf/pull/1331

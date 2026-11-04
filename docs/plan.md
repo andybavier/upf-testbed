@@ -56,9 +56,10 @@ cluster.
 
 ## Profile and scripts
 
-- `profile.py`: a geni-lib profile with parameters for node type, OS image,
-  number of links, and whether to add the `core` node. CloudLab can create a
+- `profile.py`: a geni-lib profile with parameters for node type, OS image
+  and the upf node's role (`wire`, `upf` or `none`). CloudLab can create a
   profile from this repository, so changes are a `git push`.
+
 Built in phase 1:
 
 - `scripts/startup.sh`: the startup service on every node. Turns on the IOMMU
@@ -85,6 +86,9 @@ Built in phase 2 (see [phase2.md](phase2.md)):
   tests expect.
 - `scripts/ptf.sh`: adapts the branch's PTF config to this testbed, starts the
   TRex daemon and runs a PTF suite.
+
+Planned for phase 3:
+
 - `testbed`: one entry point, for example
   `testbed run unary|linerate|integration --ref <branch>`. It builds that
   branch, runs the suite, and copies xunit results, TRex and BESS logs and
@@ -107,21 +111,21 @@ is in this testbed's TRex config and in the UPF's PTF config
 ([omec-project/upf#1331]). Details, the version bisect and known issues are in
 [phase1.md](phase1.md).
 
-### Phase 2: PTF unary and linerate against a UPF branch (running)
+### Phase 2: PTF unary and linerate against a UPF branch (done)
 
-On #1331: unary 5/5. In linerate, `qos_metrics` failed on CloudLab switch
-frames until the test counted its own stream, and `baseline` fails its 99.9th
-percentile latency check on most runs. See [phase2.md](phase2.md).
-
-
-Replace `testpmd` with the BESS UPF in DPDK mode. Run `ptf/run_tests` for the
-unary and linerate suites on `main` and on the #1331 branch.
-
-Done when both suites pass (or fail for known reasons) on #1331, with results
-we can post on the PR.
+Replaced `testpmd` with the BESS UPF in DPDK mode and ran `ptf/run_tests` for
+the unary and linerate suites on the #1331 branch: unary 5/5, linerate 6/6.
+Along the way, `qos_metrics` was fixed to count its own stream instead of
+port totals, which picked up CloudLab switch frames. `baseline`'s
+tail-latency check fails once a UPF instance has served earlier runs
+([omec-project/upf#1392]), so it runs on a freshly started UPF. The results
+were posted on the PR, which was merged as `84bba45a3`. See
+[phase2.md](phase2.md).
 
 ### Phase 3: Tests for the #1292 refactor
 
+- Rerun unary and linerate on upstream `main` as a baseline before the
+  refactor.
 - Run `test/integration` on the `upf` node.
 - Routing and neighbor scenarios for the Go replacement of
   `route_control.py`: next hops that resolve late, route changes and neighbor
@@ -140,9 +144,8 @@ scenarios through the UPF.
 - Can both X710 ports on c6420 carry experiment links?
 - CloudLab's switches learn MAC addresses, so a frame addressed to a MAC
   already seen on its own ingress port is dropped. Phase 1's GTP-U repro
-  likely hit this. In phase 2 TRex and the UPF have distinct MACs on each
-  link, which should avoid it, but check the PTF MAC constants against the
-  real ports.
+  likely hit this. Phase 2 didn't: `ptf.sh` sets the PTF MAC constants to
+  the real ports' MACs, so each link has distinct MACs at each end.
 - Where should this live long term? Start here, then propose a
   `testbed/cloudlab/` directory upstream once it works.
 - Whether to run tests from GHA. A self-hosted runner on a long-lived
@@ -151,4 +154,5 @@ scenarios through the UPF.
 
 [omec-project/upf#1331]: https://github.com/omec-project/upf/pull/1331
 [omec-project/upf#1292]: https://github.com/omec-project/upf/issues/1292
+[omec-project/upf#1392]: https://github.com/omec-project/upf/issues/1392
 [trex-core#1182]: https://github.com/cisco-system-traffic-generator/trex-core/issues/1182

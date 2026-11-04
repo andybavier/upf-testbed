@@ -6,18 +6,23 @@ NICs: a TRex traffic generator and a BESS UPF connected by L2 links.
 
 The testbed has two goals:
 
-1. Run the UPF's PTF unary and linerate tests on real hardware, starting with
-   the validation that [omec-project/upf#1331] needs.
+1. Run the UPF's PTF unary and linerate tests on real hardware. This
+   validated [omec-project/upf#1331].
 2. Give contributors a repeatable environment for testing larger UPF changes,
    such as the control-plane refactor in [omec-project/upf#1292].
 
-Status: phase 1 is done. It found that TRex v3.05 and later stop receiving on
-Intel i40e NICs, and the testbed's TRex config works around it
-([details](docs/phase1.md#findings)). Phase 2, the PTF tests against a real
-UPF, runs: on PR #1331, unary passes 5/5; in linerate, `qos_metrics` needed a
-test fix and `baseline` fails its tail-latency check on most runs
-([docs/phase2.md](docs/phase2.md)). See
-[docs/plan.md](docs/plan.md) for the plan.
+Status: phases 1 and 2 are done.
+
+- Phase 1 found that TRex v3.05 and later stop receiving on Intel i40e NICs;
+  capping DPDK's SIMD width works around it
+  ([details](docs/phase1.md#findings)).
+- Phase 2 runs the PTF suites against a real UPF built from any branch. With
+  #1331, merged upstream, unary passes 5/5 and linerate 6/6. `baseline` needs
+  a freshly started UPF ([omec-project/upf#1392];
+  [docs/phase2.md](docs/phase2.md)).
+
+Next is phase 3, tests for the #1292 refactor. See
+[docs/plan.md](docs/plan.md).
 
 ## Layout
 
@@ -39,3 +44,4 @@ test fix and `baseline` fails its tail-latency check on most runs
 
 [omec-project/upf#1331]: https://github.com/omec-project/upf/pull/1331
 [omec-project/upf#1292]: https://github.com/omec-project/upf/issues/1292
+[omec-project/upf#1392]: https://github.com/omec-project/upf/issues/1392
