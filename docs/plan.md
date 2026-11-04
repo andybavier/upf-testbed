@@ -87,14 +87,18 @@ Built in phase 2 (see [phase2.md](phase2.md)):
 - `scripts/ptf.sh`: adapts the branch's PTF config to this testbed, starts the
   TRex daemon and runs a PTF suite.
 
-Planned for phase 3:
+Built in phase 3 (see [phase3.md](phase3.md)):
 
-- `testbed`: one entry point, for example
-  `testbed run unary|linerate|integration --ref <branch>`. It builds that
-  branch, runs the suite, and copies xunit results, TRex and BESS logs and
-  NIC xstats into `results/<ref>/<timestamp>/`.
-- `testbed compare <ref-a> <ref-b>`: diff linerate throughput, latency and
-  QoS results between two runs, for example `main` against a branch.
+- `scripts/ptf-metrics.py`: appended to the branch's `ptf/lib/trex_utils.py`
+  by `ptf.sh`, it records the TRex flow and latency statistics each linerate
+  test reads. `ptf.sh` now files runs under `results/<ref>/`.
+- `scripts/compare.py`: compares two sets of runs, for example `main` against
+  a refactor branch: pass counts, loss and latency, with the median across
+  repeated runs, flagging regressions.
+
+Not built yet: a single `testbed run` entry point that also builds and
+restarts the UPF. For now `upf.sh` runs on the upf node and `ptf.sh` on the
+trex node.
 
 ## Phases
 
@@ -124,8 +128,11 @@ were posted on the PR, which was merged as `84bba45a3`. See
 
 ### Phase 3: Tests for the #1292 refactor
 
-- Rerun unary and linerate on upstream `main` as a baseline before the
-  refactor.
+- [x] Record linerate statistics and compare runs (`ptf-metrics.py`,
+  `compare.py`).
+- [ ] Rerun unary and linerate on upstream `main` as a baseline before the
+  refactor, several times, comparing `main` with itself to measure run-to-run
+  noise. Waiting on c220g5 nodes.
 - Run `test/integration` on the `upf` node.
 - Routing and neighbor scenarios for the Go replacement of
   `route_control.py`: next hops that resolve late, route changes and neighbor

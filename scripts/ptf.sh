@@ -6,7 +6,8 @@
 # Run the UPF's PTF tests from the trex node against the UPF that upf.sh runs
 # on the upf node. Checks out the UPF, adapts its PTF config to this testbed
 # (what ptf/README.md step 1 asks for), builds the PTF image if needed, starts
-# the TRex daemon and runs ptf/run_tests.
+# the TRex daemon and runs ptf/run_tests. Records the TRex statistics the
+# linerate tests read (scripts/ptf-metrics.py), for compare.py.
 
 set -euo pipefail
 source "$(dirname "$0")/lib.sh"
@@ -16,12 +17,14 @@ UPF_REPO=https://github.com/omec-project/upf
 UPF_REF=main
 FETCH=1
 AVX2_RX=()
+LABEL=
 
 usage() {
 	cat <<-EOF
 		usage: ptf.sh [options] unary|linerate [TEST]
 		  --upf-repo URL   UPF repository ($UPF_REPO)
 		  --upf-ref REF    branch or commit to test ($UPF_REF)
+		  --label NAME     results directory name (default: REF, / -> _)
 		  --no-fetch       test the checkout as it is
 		  --avx2-rx        remove the trex-core#1182 SIMD cap, even the branch's
 		TEST is a test file or file.TestCase within the suite, e.g. baseline.
@@ -33,6 +36,7 @@ while (($#)); do
 	case "$1" in
 	--upf-repo) UPF_REPO="$2" && shift ;;
 	--upf-ref) UPF_REF="$2" && shift ;;
+	--label) LABEL="$2" && shift ;;
 	--no-fetch) FETCH=0 ;;
 	--avx2-rx) AVX2_RX=(--avx2-rx) ;;
 	-*) usage ;;
@@ -48,7 +52,8 @@ load_ports
 [[ -n "${PORT0_PEER_MAC:-}" ]] || die "ports.env has no peer MACs; rerun startup.sh"
 
 SRC="$STATE_DIR/src/upf"
-OUT="$STATE_DIR/results/phase2/$(date -u +%Y%m%dT%H%M%SZ)-$SUITE${TEST:+-$TEST}"
+LABEL="${LABEL:-${UPF_REF//\//_}}"
+OUT="$STATE_DIR/results/$LABEL/$(date -u +%Y%m%dT%H%M%SZ)-$SUITE${TEST:+-$TEST}"
 mkdir -p "$OUT"
 log "Results go to $OUT"
 
@@ -90,7 +95,11 @@ sed -i \
 	-e "s/^UPF_CORE_MAC = \"[^\"]*\"/UPF_CORE_MAC = \"$PORT1_PEER_MAC\"/" \
 	-e "s/^UPF_ACCESS_MAC = \"[^\"]*\"/UPF_ACCESS_MAC = \"$PORT0_PEER_MAC\"/" \
 	"$SRC/ptf/tests/linerate/common.py"
+# Record the TRex statistics the tests read; see scripts/ptf-metrics.py.
+cat "$TESTBED_DIR/scripts/ptf-metrics.py" >> "$SRC/ptf/lib/trex_utils.py"
 git -C "$SRC" diff > "$OUT/localization.diff"
+# ptf/log isn't tracked, so clear the previous run's logs and metrics.
+rm -rf "$SRC/ptf/log"
 
 # ptf_runner.py drives TRex through its daemon, which starts the server with
 # the config above. The PTF container reaches it through docker0.

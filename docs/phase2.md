@@ -87,9 +87,11 @@ for), starts the TRex daemon, and runs `ptf/run_tests`:
 - `UPF_ADDR` and `TREX_ADDR` point at the upf node and the local TRex
   daemon.
 
-Results go to `/var/lib/upf-testbed/results/phase2/<timestamp>-<suite>/`:
+Results go to `/var/lib/upf-testbed/results/<ref>/<timestamp>-<suite>/`:
 `run.log`, the PTF xunit logs, `localization.diff` (the config changes
-above), `host.txt` and the TRex server log.
+above), `host.txt` and the TRex server log. (Phase 2 runs used
+`results/phase2/`; phase 3 added the per-ref directories and the metrics
+that [phase3.md](phase3.md) compares.)
 
 ## Results
 

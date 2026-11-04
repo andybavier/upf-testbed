@@ -21,8 +21,10 @@ Status: phases 1 and 2 are done.
   a freshly started UPF ([omec-project/upf#1392];
   [docs/phase2.md](docs/phase2.md)).
 
-Next is phase 3, tests for the #1292 refactor. See
-[docs/plan.md](docs/plan.md).
+Phase 3, tests for the #1292 refactor, is under way: runs now record
+linerate statistics, and `scripts/compare.py` compares a branch against
+`main` ([docs/phase3.md](docs/phase3.md)). The baseline on `main` is next.
+See [docs/plan.md](docs/plan.md).
 
 ## Layout
 
@@ -40,6 +42,8 @@ Next is phase 3, tests for the #1292 refactor. See
 | `scripts/upf.sh` | Builds the BESS UPF from a branch and runs it in DPDK mode on the upf node |
 | `scripts/upf-config.py` | Writes the UPF config the PTF tests need |
 | `scripts/ptf.sh` | Runs the PTF unary or linerate suite from the trex node |
+| `scripts/ptf-metrics.py` | Appended to the branch's PTF library to record the TRex statistics tests read |
+| `scripts/compare.py` | Compares PTF results between two sets of runs, such as `main` and a branch |
 | `scripts/manifest.py` | Reads peer MACs and control addresses from the CloudLab manifest |
 
 [omec-project/upf#1331]: https://github.com/omec-project/upf/pull/1331
