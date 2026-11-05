@@ -47,9 +47,10 @@ and gives the UPF real L3 neighbors.
 
 | Node type | Cluster | NIC | Notes |
 |---|---|---|---|
-| c6420 | Clemson | Intel X710 10G, dual-port (i40e) | Same NIC family as the #1331 testbed. Two sockets. Need to confirm both ports can be used for experiment links. |
-| c220g5 | Wisconsin | Intel X710 10G, dual-port (i40e), firmware 8.50 | CloudLab's hardware page says X520, but the nodes we got had X710s with both ports usable for experiments. Many nodes. |
-| c6620 | Utah | Intel E810 25G/100G (ice) | One port of each speed for experiments; a later option. |
+| c220g5 | Wisconsin | Intel X710 10G, dual-port (i40e), firmware 8.50 | CloudLab's hardware page says X520, but the nodes we got had X710s with both ports usable for experiments. Many nodes. Used for phases 1 and 2. |
+| c220g2, c220g1 | Wisconsin | Intel X520 10G, dual-port (ixgbe), per CloudLab's hardware page | Both ports usable for experiments, per the same page. Untested and not in the profile yet; the fallback when c220g5 is busy. |
+| c6620 | Utah | Intel E810 25G/100G (ice) | One port of each speed for experiments, on separate NICs. Would need links of two speeds and Intel's DDP package for DPDK; a later option. |
+| c6420 | Clemson | Intel X710 10G (i40e) | Not usable: only one experiment port. CloudLab refused to map the profile on 2026-11-05 ("2 requested, 1 found"). |
 
 The node type is a profile parameter. Both nodes must come from the same
 cluster.
@@ -148,7 +149,6 @@ scenarios through the UPF.
 
 ## Open questions
 
-- Can both X710 ports on c6420 carry experiment links?
 - CloudLab's switches learn MAC addresses, so a frame addressed to a MAC
   already seen on its own ingress port is dropped. Phase 1's GTP-U repro
   likely hit this. Phase 2 didn't: `ptf.sh` sets the PTF MAC constants to

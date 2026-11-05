@@ -22,7 +22,6 @@ pc.defineParameter(
     "c220g5",
     legalValues=[
         ("c220g5", "c220g5 (Wisconsin, Intel X710 10G)"),
-        ("c6420", "c6420 (Clemson, Intel X710 10G, untested)"),
     ],
     longDescription="Both nodes use this type. Each needs two experiment "
     "ports on its DPDK NIC. CloudLab's hardware page lists an X520 for "
